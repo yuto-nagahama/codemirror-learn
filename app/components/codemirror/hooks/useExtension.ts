@@ -8,7 +8,6 @@ import { javascript } from "@codemirror/lang-javascript";
 import { php } from "@codemirror/lang-php";
 import { html } from "@codemirror/lang-html";
 import { tags } from "@lezer/highlight";
-import { commandBold } from "../keymap/bold";
 import { useDragDropImageExtension } from "../drag-drop/image/useDragDropImageExtension";
 import { insertMarkCommand } from "../keymap/insertMark";
 import { insertTextCommand } from "../keymap/insertText";
@@ -68,7 +67,7 @@ export const useExtension = ({ setDoc }: Props) => {
       },
       {
         key: "Alt-t",
-        run: insertTextCommand(`|  |  |  |\n| -- | -- | -- |\n|  |  |  |`),
+        run: insertTextCommand(`|  |  |\n| -- | -- |\n|  |  |`),
       },
       ...historyKeymap,
     ]);

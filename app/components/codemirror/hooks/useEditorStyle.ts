@@ -9,6 +9,7 @@ export const useEditorStyle = () => {
       },
       // editorの外枠
       "&.cm-editor": {
+        minHeight: "6rem",
         outline: "none", // エディターの枠線を非表示
       },
       // editorの内部

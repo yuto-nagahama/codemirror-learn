@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EditorView } from "codemirror";
 import { EditorState, Text } from "@codemirror/state";
 import { useExtension } from "./useExtension";
 
 type UseCodemirrorProps = {
-  doc?: string | Text;
+  doc?: string;
   setDoc?: (content: string) => void;
 };
 
@@ -13,40 +13,6 @@ export const useCodemirror = ({ doc, setDoc }: UseCodemirrorProps) => {
   const [container, setContainer] = useState<HTMLDivElement>();
   const [view, setView] = useState<EditorView>();
   const extensions = useExtension({ setDoc });
-  const insertTextToEditor = useCallback(
-    (mark: string) => {
-      if (!view) return;
-
-      const range = view.state.selection.main;
-
-      if (
-        view.state.sliceDoc(range.from, range.from + 2) == mark &&
-        view.state.sliceDoc(range.to - 2, range.to) == mark
-      ) {
-        const transaction = view.state.update({
-          changes: {
-            from: range.from,
-            to: range.to,
-            insert: view.state.sliceDoc(range.from + 2, range.to - 2),
-          },
-        });
-        view.dispatch(transaction);
-      } else {
-        const transaction = view.state.update({
-          changes: {
-            from: range.from,
-            to: range.to,
-            insert: `${mark}${view.state.sliceDoc(
-              range.from,
-              range.to
-            )}${mark}`,
-          },
-        });
-        view.dispatch(transaction);
-      }
-    },
-    [view]
-  );
 
   // editorのrefをcontainerに設定する
   useEffect(() => {
@@ -73,6 +39,5 @@ export const useCodemirror = ({ doc, setDoc }: UseCodemirrorProps) => {
   return {
     editor,
     view,
-    insertTextToEditor,
   };
 };

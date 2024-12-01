@@ -1,3 +1,6 @@
+import { EditorView } from "codemirror";
+import { insertMarkCommand } from "../keymap/insertMark";
+import { insertTextCommand } from "../keymap/insertText";
 import {
   BoldIcon,
   H1Icon,
@@ -6,9 +9,6 @@ import {
   ItalicIcon,
   StrikethroughIcon,
 } from "@heroicons/react/24/outline";
-import { EditorView } from "codemirror";
-import { insertMarkCommand } from "../keymap/insertMark";
-import { insertTextCommand } from "../keymap/insertText";
 
 type Props = {
   view?: EditorView;

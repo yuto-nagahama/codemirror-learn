@@ -1,6 +1,8 @@
 import { vitePlugin as remix } from "@remix-run/dev";
 import { defineConfig } from "vite";
+import { comlink } from "vite-plugin-comlink";
 import tsconfigPaths from "vite-tsconfig-paths";
+import basicSsl from "@vitejs/plugin-basic-ssl";
 
 declare module "@remix-run/node" {
   interface Future {
@@ -8,7 +10,14 @@ declare module "@remix-run/node" {
   }
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  server: {
+    proxy: {},
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "require-corp",
+    },
+  },
   plugins: [
     remix({
       future: {
@@ -20,5 +29,13 @@ export default defineConfig({
       },
     }),
     tsconfigPaths(),
+    comlink(),
+    basicSsl(),
   ],
-});
+  optimizeDeps: {
+    exclude: ["@sqlite.org/sqlite-wasm"],
+  },
+  worker: {
+    plugins: () => [comlink()],
+  },
+}));
