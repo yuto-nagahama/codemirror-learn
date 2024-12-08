@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Links,
   Meta,
@@ -7,8 +7,8 @@ import {
   ScrollRestoration,
 } from "@remix-run/react";
 import type { LinksFunction } from "@remix-run/node";
-
 import "./tailwind.css";
+import pollingWorker from "./worker/polling-worker?worker";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -24,24 +24,33 @@ export const links: LinksFunction = () => [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const worker = useRef<Worker | null>(null);
   const [isSwInstalling, setIsSwInstalling] = useState(true);
 
   useEffect(() => {
-    const sw = async () => {
+    const workerStandby = async () => {
       if ("serviceWorker" in navigator) {
         const registration = await navigator.serviceWorker.getRegistration();
 
         if (registration == null) {
           await navigator.serviceWorker.register("/sw.js");
           setIsSwInstalling(false);
-          return;
+        } else {
+          await registration.update();
+          setIsSwInstalling(false);
         }
+      }
 
-        await registration.update();
-        setIsSwInstalling(false);
+      if (worker.current == null) {
+        worker.current = new pollingWorker({ name: "polling-worker" });
       }
     };
-    sw();
+    workerStandby();
+
+    return () => {
+      worker.current?.terminate();
+      worker.current = null;
+    };
   }, []);
 
   return (
