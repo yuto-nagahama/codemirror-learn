@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Links,
   Meta,
@@ -24,10 +24,24 @@ export const links: LinksFunction = () => [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const [isSwInstalling, setIsSwInstalling] = useState(true);
+
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js");
-    }
+    const sw = async () => {
+      if ("serviceWorker" in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration();
+
+        if (registration == null) {
+          await navigator.serviceWorker.register("/sw.js");
+          setIsSwInstalling(false);
+          return;
+        }
+
+        await registration.update();
+        setIsSwInstalling(false);
+      }
+    };
+    sw();
   }, []);
 
   return (
@@ -39,7 +53,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body className="w-screen h-screen box-border p-8">
-        {children}
+        {!isSwInstalling && children}
         <ScrollRestoration />
         <Scripts />
       </body>

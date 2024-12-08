@@ -2180,9 +2180,9 @@ var require_localforage_getitems = __commonJS({
   "node_modules/.pnpm/localforage-getitems@1.4.2/node_modules/localforage-getitems/dist/localforage-getitems.js"(exports, module) {
     (function(global2, factory) {
       typeof exports === "object" && typeof module !== "undefined" ? factory(exports, require_localforage()) : typeof define === "function" && define.amd ? define(["exports", "localforage"], factory) : factory(global2.localforageGetItems = global2.localforageGetItems || {}, global2.localforage);
-    })(exports, function(exports2, localforage2) {
+    })(exports, function(exports2, localforage) {
       "use strict";
-      localforage2 = "default" in localforage2 ? localforage2["default"] : localforage2;
+      localforage = "default" in localforage ? localforage["default"] : localforage;
       function getSerializerPromise(localForageInstance) {
         if (getSerializerPromise.result) {
           return getSerializerPromise.result;
@@ -2365,7 +2365,7 @@ var require_localforage_getitems = __commonJS({
           };
         }
       }
-      var extendPrototypeResult = extendPrototype2(localforage2);
+      var extendPrototypeResult = extendPrototype2(localforage);
       exports2.localforageGetItems = localforageGetItems;
       exports2.extendPrototype = extendPrototype2;
       exports2.extendPrototypeResult = extendPrototypeResult;
@@ -2376,24 +2376,28 @@ var require_localforage_getitems = __commonJS({
 });
 
 // app/sw.js
+var import_localforage = __toESM(require_localforage(), 1);
 var import_localforage_getitems = __toESM(require_localforage_getitems(), 1);
-var localForage = require_localforage();
-self.addEventListener("install", (event) => {
-  (0, import_localforage_getitems.extendPrototype)(localForage);
-  const init = async () => {
-    const cache = await caches.open("image");
-    const dbInstance = localforage.createInstance({ name: "fileCache" });
+(0, import_localforage_getitems.extendPrototype)(import_localforage.default);
+var CACHE_VERSION = 0;
+var expires = 1e3;
+self.addEventListener("activate", (event) => {
+  const fn = async () => {
+    console.log(1111);
+    const dbInstance = import_localforage.default.createInstance({
+      name: "fileCache",
+      version: CACHE_VERSION
+    });
     const items = await dbInstance.getItems();
     await Promise.all(
       Object.entries(items).map(async ([key, value]) => {
-        if (value == null) {
-          return;
+        if (Date.now() - value.createdAt > expires) {
+          await dbInstance.removeItem(key);
         }
-        await cache.put(key, value);
       })
     );
   };
-  event.waitUntil(init());
+  event.waitUntil(fn());
 });
 self.addEventListener("fetch", (event) => {
   const request = event.request.clone();
@@ -2407,23 +2411,24 @@ self.addEventListener("fetch", (event) => {
           return new Response(null, { status: 400 });
         }
         if (file.type.startsWith("image")) {
-          const dbInstance = localforage.createInstance({ name: "fileCache" });
-          await dbInstance.setItem(`/asset/image/${file.name}`, file);
+          const dbInstance = import_localforage.default.createInstance({
+            name: "fileCache",
+            version: CACHE_VERSION
+          });
+          await dbInstance.setItem(`/asset/image/${file.name}`, {
+            createdAt: Date.now(),
+            file
+          });
         }
         return new Response(null, { status: 200 });
       })()
     );
   }
   if (request.method === "GET") {
-    const cacheBypass = request.cache === "no-cache" || request.headers.get("pragma") === "no-cache";
-    console.log(request);
-    if (cacheBypass) {
-      console.log(request);
-    }
     if (pathname.startsWith(`/asset/image`)) {
       event.respondWith(
         (async () => {
-          const dbInstance = localforage.createInstance({ name: "fileCache" });
+          const dbInstance = import_localforage.default.createInstance({ name: "fileCache" });
           const cache = await dbInstance.getItem(pathname);
           if (cache == null) {
             return new Response(null, { status: 404 });
@@ -2431,7 +2436,7 @@ self.addEventListener("fetch", (event) => {
           const headers = {
             "Content-Type": cache.type
           };
-          const res = new Response(cache, {
+          const res = new Response(cache.file, {
             headers
           });
           return res;

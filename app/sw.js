@@ -1,23 +1,30 @@
-const localForage = require("localforage");
+import localForage from "localforage";
 import { extendPrototype } from "localforage-getitems";
+extendPrototype(localForage);
 
-self.addEventListener("install", (event) => {
-  extendPrototype(localForage);
+const CACHE_VERSION = 0;
+const expires = 7884000000; // 3ヶ月(ミリ秒)
 
-  const init = async () => {
-    const cache = await caches.open("image");
-    const dbInstance = localforage.createInstance({ name: "fileCache" });
+self.addEventListener("activate", (event) => {
+  const fn = async () => {
+    console.log(1111);
+    const dbInstance = localForage.createInstance({
+      name: "fileCache",
+      version: CACHE_VERSION,
+    });
+    /** @type { { [key in string]: { createdAt: number, file: File } } } */
     const items = await dbInstance.getItems();
+
+    // 3ヶ月以上前のキャッシュは削除する
     await Promise.all(
       Object.entries(items).map(async ([key, value]) => {
-        if (value == null) {
-          return;
+        if (Date.now() - value.createdAt > expires) {
+          await dbInstance.removeItem(key);
         }
-        await cache.put(key, value);
       })
     );
   };
-  event.waitUntil(init());
+  event.waitUntil(fn());
 });
 
 self.addEventListener("fetch", (event) => {
@@ -35,19 +42,15 @@ self.addEventListener("fetch", (event) => {
           return new Response(null, { status: 400 });
         }
 
-        // const headers = {
-        //   "Content-Type": file.type,
-        // };
-        // const response = new Response(file, {
-        //   headers,
-        // });
-
         if (file.type.startsWith("image")) {
-          const dbInstance = localforage.createInstance({ name: "fileCache" });
-          await dbInstance.setItem(`/asset/image/${file.name}`, file);
-          // const cacheUrl = `${baseUrl}/image/${file.name}`;
-          // const cache = await caches.open("image");
-          // await cache.put(new Request(cacheUrl), response);
+          const dbInstance = localForage.createInstance({
+            name: "fileCache",
+            version: CACHE_VERSION,
+          });
+          await dbInstance.setItem(`/asset/image/${file.name}`, {
+            createdAt: Date.now(),
+            file,
+          });
         }
 
         return new Response(null, { status: 200 });
@@ -56,29 +59,21 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.method === "GET") {
-    const cacheBypass =
-      request.cache === "no-cache" ||
-      request.headers.get("pragma") === "no-cache";
-    console.log(request);
-    if (cacheBypass) {
-      console.log(request);
-    }
     if (pathname.startsWith(`/asset/image`)) {
       event.respondWith(
         (async () => {
-          // const cache = await caches.open("image");
-          // const res = await cache.match(request);
-          const dbInstance = localforage.createInstance({ name: "fileCache" });
-          /** @type {File | undefined} */
+          const dbInstance = localForage.createInstance({ name: "fileCache" });
+          /** @type { { createdAt: number, file: File } | undefined } */
           const cache = await dbInstance.getItem(pathname);
 
           if (cache == null) {
             return new Response(null, { status: 404 });
           }
+
           const headers = {
             "Content-Type": cache.type,
           };
-          const res = new Response(cache, {
+          const res = new Response(cache.file, {
             headers,
           });
 
