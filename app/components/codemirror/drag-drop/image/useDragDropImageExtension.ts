@@ -2,6 +2,21 @@ import { EditorView } from "codemirror";
 import { useMemo } from "react";
 
 export const useDragDropImageExtension = () => {
+  const imageUpload = (file: File, cb: (url: string) => void) => {
+    const id = crypto.randomUUID();
+    const formData = new FormData();
+    const pos = file.name.lastIndexOf(".");
+    const ext = pos === -1 ? "" : file.name.slice(pos + 1);
+    const fileName = `${id}.${ext}`;
+    formData.set("file", file, fileName);
+
+    fetch(`/api/asset/upload`, {
+      body: formData,
+      method: "POST",
+    }).then(() => {
+      cb(`/asset/image/${fileName}`);
+    });
+  };
   return useMemo(
     () =>
       EditorView.domEventHandlers({
@@ -35,14 +50,19 @@ export const useDragDropImageExtension = () => {
                 const file = item.getAsFile();
                 if (!file) return;
 
-                insertText("test");
+                imageUpload(file, (url) => {
+                  insertText(url);
+                });
               }
             }
           } else {
             // DataTransfer インターフェイスを使用してファイルにアクセスする
             for (let i = 0; i < event.dataTransfer.files.length; i++) {
               const file = event.dataTransfer.files[i];
-              insertText("test");
+
+              imageUpload(file, (url) => {
+                insertText(url);
+              });
             }
           }
         },

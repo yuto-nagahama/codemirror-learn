@@ -46,8 +46,14 @@ export const initializeSQLite = async () => {
         sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE
       );
     } else {
+      await db.exec("pragma encoding = 'UTF-8'");
+      await db.exec("pragma page_size = 65536");
+      await db.exec("pragma max_page_count = 8589934588");
+      await db.exec("pragma cache_size = -10000000");
+      await db.exec("pragma synchronous = 'normal'");
+
       await db.exec(
-        "CREATE TABLE IF NOT EXISTS report(id text primary key, markdown TEXT)"
+        "CREATE TABLE IF NOT EXISTS report(id text primary key, markdown TEXT(100000))"
       );
 
       const dbfile = sqlite3?.capi.sqlite3_js_db_export(db);

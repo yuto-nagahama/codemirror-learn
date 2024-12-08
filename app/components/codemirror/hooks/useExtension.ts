@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { EditorView, keymap, ViewUpdate } from "@codemirror/view";
-import { history, historyKeymap } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
@@ -70,6 +70,7 @@ export const useExtension = ({ setDoc }: Props) => {
         run: insertTextCommand(`|  |  |\n| -- | -- |\n|  |  |`),
       },
       ...historyKeymap,
+      ...defaultKeymap,
     ]);
   }, []);
   const updateListener = useMemo(() => {

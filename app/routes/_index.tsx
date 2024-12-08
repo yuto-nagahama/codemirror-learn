@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { ActionFunction, LoaderFunction } from "@remix-run/node";
+import {
+  ActionFunction,
+  HeadersFunction,
+  LoaderFunction,
+} from "@remix-run/node";
 import { Form } from "@remix-run/react";
 import { Remote } from "comlink";
 import markdownit from "markdown-it";
@@ -7,6 +11,11 @@ import hljs from "highlight.js";
 import Handlebars from "handlebars";
 import { authorize, listFiles, uploadFile } from "~/drive";
 import CodemirrorWrapper from "~/components/codemirror/CodemirrorWrapper";
+
+export const headers: HeadersFunction = () => ({
+  "Cross-Origin-Embedder-Policy": "require-corp",
+  "Cross-Origin-Opener-Policy": "same-origin",
+});
 
 export const action: ActionFunction = async ({ request }) => {
   const client = await authorize(request.headers.get("goog_drv_token"));
@@ -43,7 +52,7 @@ const markdown = markdownit({
 // const md = "<!-- -->\n```javascript\nconsole.log('hello');\n```\n"
 
 export default function Index() {
-  const worker = useRef<Remote<typeof import("../../worker")> | null>(null);
+  const worker = useRef<Remote<typeof import("../worker")> | null>(null);
   const [doc, setDoc] = useState<string | null>(null);
   const [preview, setPreview] = useState("");
   const handleUpdateDoc = (content: string) => {
@@ -74,8 +83,8 @@ export default function Index() {
 
   useEffect(() => {
     if (!worker.current) {
-      worker.current = new ComlinkWorker<typeof import("../../worker")>(
-        new URL("../../worker", import.meta.url),
+      worker.current = new ComlinkWorker<typeof import("../worker")>(
+        new URL("../worker", import.meta.url),
         {
           name: "sqliteComlink",
           type: "module",
@@ -95,7 +104,6 @@ export default function Index() {
           ["1"]
         );
 
-        console.log(text);
         if (typeof text === "string") {
           setDoc(text);
         } else if (typeof text === "undefined") {
@@ -109,6 +117,7 @@ export default function Index() {
 
   return (
     <Form method="POST" className="flex flex-col gap-8" replace>
+      <img src="/logo-dark.png" className="h-24 w-80" />
       <button type="submit" className="btn btn-sm w-fit">
         upload
       </button>

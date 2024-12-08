@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo } from "react";
+import { memo } from "react";
 import { useCodemirror } from "./hooks/useCodemirror";
 import EditorToolbar from "./toolbar";
 

@@ -11,8 +11,12 @@ declare module "@remix-run/node" {
 }
 
 export default defineConfig(({ mode }) => ({
+  build: {
+    target: ["ESNext"],
+  },
   server: {
     proxy: {},
+    hmr: false,
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin",
       "Cross-Origin-Embedder-Policy": "require-corp",
@@ -37,5 +41,12 @@ export default defineConfig(({ mode }) => ({
   },
   worker: {
     plugins: () => [comlink()],
+    rollupOptions: {
+      output: {
+        entryFileNames: () => {
+          return `[name]-${Date.now()}.js`;
+        },
+      },
+    },
   },
 }));

@@ -1,10 +1,6 @@
 import { google } from "googleapis";
+import { googleDriveToken } from "~/cookie";
 import { getSecret } from "~/secret";
-import { createCookie } from "@remix-run/node";
-
-const cookie = await createCookie("goog_drv_token", {
-  maxAge: 604_800,
-});
 
 const SCOPES = [
   "https://www.googleapis.com/auth/drive",
@@ -23,11 +19,11 @@ async function saveCredentials(client: any) {
     refresh_token: client.credentials.refresh_token,
   });
 
-  await cookie.serialize(payload);
+  await googleDriveToken.serialize(payload);
 }
 
 export async function authorize(cookieString: string | null) {
-  let client = await cookie.parse(cookieString);
+  let client = await googleDriveToken.parse(cookieString);
 
   if (client) {
     return client;
