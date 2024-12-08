@@ -7,7 +7,6 @@ const expires = 7884000000; // 3ヶ月(ミリ秒)
 
 self.addEventListener("activate", (event) => {
   const fn = async () => {
-    console.log(1111);
     const dbInstance = localForage.createInstance({
       name: "fileCache",
       version: CACHE_VERSION,
