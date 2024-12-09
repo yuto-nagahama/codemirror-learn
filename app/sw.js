@@ -2,23 +2,37 @@ import localForage from "localforage";
 import { extendPrototype } from "localforage-getitems";
 extendPrototype(localForage);
 
-const CACHE_VERSION = 0;
+const CACHE_VERSION = 1;
 const expires = 7884000000; // 3ヶ月(ミリ秒)
 
 self.addEventListener("activate", (event) => {
   const fn = async () => {
-    const dbInstance = localForage.createInstance({
+    const fileDb = localForage.createInstance({
       name: "fileCache",
       version: CACHE_VERSION,
     });
-    /** @type { { [key in string]: { createdAt: number, file: File } } } */
-    const items = await dbInstance.getItems();
+    const reportDb = localForage.createInstance({
+      name: "report",
+      version: CACHE_VERSION,
+    });
+    /** @type { [{ [key in string]: { createdAt: number, file: File } }, { [key in string]: { updatedAt: number, encryptionDb: Uint8Array } }] } */
+    const [cacheFiles, reportData] = await Promise.all([
+      fileDb.getItems(),
+      reportDb.getItems(),
+    ]);
 
     // 3ヶ月以上前のキャッシュは削除する
+    const data = [...Object.entries(cacheFiles), ...Object.entries(reportData)];
     await Promise.all(
-      Object.entries(items).map(async ([key, value]) => {
-        if (Date.now() - value.createdAt > expires) {
-          await dbInstance.removeItem(key);
+      data.map(async ([key, value]) => {
+        if ("updatedAt" in value) {
+          if (Date.now() - value.updatedAt > expires) {
+            await reportDb.removeItem(key);
+          }
+        } else {
+          if (Date.now() - value.createdAt > expires) {
+            await cacheFiles.removeItem(key);
+          }
         }
       })
     );

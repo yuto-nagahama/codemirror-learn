@@ -11,6 +11,10 @@ const error = console.error;
 
 let db: Database | null = null;
 let sqlite3: Sqlite3Static | null = null;
+let jwk: JsonWebKey | null = null;
+
+const USERID = "1";
+const CACHE_VERSION = 1;
 
 const start = (sqlite3: Sqlite3Static) => {
   log("Running SQLite3 version", sqlite3.version.libVersion);
@@ -19,7 +23,7 @@ const start = (sqlite3: Sqlite3Static) => {
   return db;
 };
 
-export const initializeSQLite = async () => {
+export const initializeSQLite = async (key: JsonWebKey) => {
   if (db) {
     return db;
   }
@@ -31,18 +35,34 @@ export const initializeSQLite = async () => {
       print: log,
       printErr: error,
     });
+    jwk = key;
 
     const db = start(sqlite3);
-    const dbfile = await localforage.getItem<Uint8Array>("1");
+    const reportDb = localforage.createInstance({
+      name: "report",
+      version: CACHE_VERSION,
+    });
+    const dbfile = await reportDb.getItem<
+      { updatedAt: number; encryptionDb: Uint8Array } | undefined
+    >(USERID);
 
     if (dbfile) {
-      const p = sqlite3.wasm.allocFromTypedArray(dbfile);
+      const { encryptionDb } = dbfile;
+      const importedSecretKey = await getImportKey(jwk);
+      const encoder = new TextEncoder();
+      const iv = encoder.encode(USERID); // ユーザーIDを使う
+      const decryptDbFile = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        importedSecretKey,
+        encryptionDb
+      );
+      const p = sqlite3.wasm.allocFromTypedArray(decryptDbFile);
       sqlite3.capi.sqlite3_deserialize(
         db,
         "main",
         p,
-        dbfile.byteLength,
-        dbfile.byteLength,
+        decryptDbFile.byteLength,
+        decryptDbFile.byteLength,
         sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE
       );
     } else {
@@ -51,7 +71,6 @@ export const initializeSQLite = async () => {
       await db.exec("pragma max_page_count = 8589934588");
       await db.exec("pragma cache_size = -10000000");
       await db.exec("pragma synchronous = 'normal'");
-
       await db.exec(
         "CREATE TABLE IF NOT EXISTS report(id text primary key, markdown TEXT(100000))"
       );
@@ -64,7 +83,7 @@ export const initializeSQLite = async () => {
         throw error;
       }
 
-      await localforage.setItem("1", dbfile);
+      await encryption(USERID);
     }
 
     return db;
@@ -91,15 +110,7 @@ export const exec = async (sql: any, opts?: any) => {
     result = db.exec(sql);
   }
 
-  const dbfile = sqlite3?.capi.sqlite3_js_db_export(db);
-
-  if (!dbfile) {
-    const error = new Error("Could not retrieve db file.");
-    console.error(error);
-    throw error;
-  }
-
-  await localforage.setItem("1", dbfile);
+  await encryption(USERID);
 
   return result;
 };
@@ -116,7 +127,14 @@ export const selectValue = (
   return db.selectValue(sql, bind, asType);
 };
 
-export const dataExport = async () => {
+const getImportKey = async (key: JsonWebKey) => {
+  return crypto.subtle.importKey("jwk", key, { name: "AES-GCM" }, false, [
+    "encrypt",
+    "decrypt",
+  ]);
+};
+
+const encryption = async (id: string) => {
   if (!db) {
     throw new Error("db is not connected.");
   }
@@ -127,5 +145,25 @@ export const dataExport = async () => {
     throw new Error("Could not retrieve .db file.");
   }
 
-  await localforage.setItem("1", dbfile);
+  if (!jwk) {
+    throw new Error("jwk is not defined.");
+  }
+
+  const encoder = new TextEncoder();
+  const iv = encoder.encode(id); // ユーザーIDを使う
+  const importedSecretKey = await getImportKey(jwk);
+  const encryptedArrayBuffer = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    importedSecretKey,
+    dbfile
+  );
+
+  const reportDb = localforage.createInstance({
+    name: "report",
+    version: CACHE_VERSION,
+  });
+  await reportDb.setItem(id, {
+    updatedAt: Date.now(),
+    encryptionDb: encryptedArrayBuffer,
+  });
 };

@@ -11,6 +11,7 @@ import hljs from "highlight.js";
 import Handlebars from "handlebars";
 import { authorize, listFiles, uploadFile } from "~/drive";
 import CodemirrorWrapper from "~/components/codemirror/CodemirrorWrapper";
+import { generateJwkFromUserId, generateSalt } from "~/crypto";
 
 export const headers: HeadersFunction = () => ({
   "Cross-Origin-Embedder-Policy": "require-corp",
@@ -96,8 +97,10 @@ export default function Index() {
           return;
         }
 
+        const salt = generateSalt();
+        const jwk = await generateJwkFromUserId("1", salt);
         const db = worker.current;
-        await db.initializeSQLite();
+        await db.initializeSQLite(jwk);
 
         const text = await db.selectValue(
           `select markdown from report where id = ?`,
@@ -129,7 +132,7 @@ export default function Index() {
         <div className="size-full">
           <div
             dangerouslySetInnerHTML={{ __html: preview }}
-            className="size-full border border-base-300"
+            className="size-full border border-base-300 prose"
           ></div>
         </div>
       </div>
