@@ -1,48 +1,45 @@
+import * as metadata from "gcp-metadata";
 import { google } from "googleapis";
-import { googleDriveToken } from "~/cookie";
-import { getSecret } from "~/secret";
+import { OAuth2Client, TokenPayload } from "google-auth-library";
 
-const SCOPES = [
-  "https://www.googleapis.com/auth/drive",
-  "https://www.googleapis.com/auth/drive.appdata",
-  "https://www.googleapis.com/auth/drive.appfolder",
-];
+let aud: string;
 
-async function saveCredentials(client: any) {
-  const content = await getSecret();
-  const keys = JSON.parse(content);
-  const key = keys.installed || keys.web;
-  const payload = JSON.stringify({
-    type: "authorized_user",
-    client_id: key.client_id,
-    client_secret: key.client_secret,
-    refresh_token: client.credentials.refresh_token,
-  });
-
-  await googleDriveToken.serialize(payload);
-}
-
-export async function authorize(cookieString: string | null) {
-  let client = await googleDriveToken.parse(cookieString);
-
-  if (client) {
-    return client;
+async function getAudience() {
+  if (aud) return aud;
+  if (!(await metadata.isAvailable())) {
+    throw new Error("プロジェクトのメタデータが取得できませんでした");
   }
 
-  client = new google.auth.GoogleAuth({
-    credentials: JSON.parse(await getSecret()),
-    scopes: SCOPES,
-  });
+  const projectNumber = await metadata.project("numeric-project-id");
+  const projectId = await metadata.project("project-id");
 
-  if (client.credentials) {
-    await saveCredentials(client);
-  }
-
-  return client;
+  aud = `/projects/${projectNumber}/apps/${projectId}`;
+  return aud;
 }
 
-export async function listFiles(authClient: any) {
-  const drive = google.drive({ version: "v3", auth: authClient });
+export async function getIapUser(
+  client: OAuth2Client,
+  iapJwt: string
+): Promise<TokenPayload | null> {
+  const aud = await getAudience();
+  const { pubkeys } = await client.getIapPublicKeys();
+  const ticket = await client.verifySignedJwtWithCertsAsync(
+    iapJwt,
+    pubkeys,
+    aud,
+    ["https://cloud.google.com/iap"]
+  );
+  const payload = ticket.getPayload();
+
+  if (!payload) {
+    return null;
+  }
+
+  return payload;
+}
+
+export async function listFiles(auth: OAuth2Client) {
+  const drive = google.drive({ version: "v3", auth });
   const res = await drive.files.list({
     includeTeamDriveItems: true,
     supportsTeamDrives: true,
@@ -67,37 +64,25 @@ export async function listFiles(authClient: any) {
   });
 }
 
-export async function uploadFile(authClient: any, text: string) {
-  const drive = google.drive({ version: "v3", auth: authClient });
-  const res = await drive.files.list({
-    includeTeamDriveItems: true,
-    supportsTeamDrives: true,
-    corpora: "allDrives",
-    q: "mimeType = 'application/vnd.google-apps.folder' and name = 'shared'",
-    pageSize: 999,
-    fields: "files(id)",
-  });
-
-  const files = res.data.files;
-  console.log(files);
-
-  if (files?.length === 0 || !files) {
-    console.log("No files found.");
-    return;
-  }
-  console.log(files[0]);
-
+export async function uploadFile(auth: OAuth2Client, body: string) {
+  const drive = google.drive({ version: "v3", auth });
   const fileMetadata = {
     name: "template.md",
-    parents: [files[0].id ?? ""],
-    mimeType: "text/plain",
+    parents: ["1Ady4HCzhjbKmQJe6NzFAlEI8FXiDdVYN"],
   };
   const media = {
     mimeType: "text/plain",
-    body: text,
+    body,
   };
-  await drive.files.create({
-    requestBody: fileMetadata,
-    media,
-  });
+  try {
+    const response = await drive.files.create({
+      supportsTeamDrives: true,
+      requestBody: fileMetadata,
+      media,
+      fields: "id",
+    });
+    console.log("File uploaded successfully, file ID:", response.data.id);
+  } catch (error) {
+    console.error("Error uploading file:", error);
+  }
 }

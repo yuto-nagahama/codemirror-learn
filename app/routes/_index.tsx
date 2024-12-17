@@ -3,31 +3,65 @@ import {
   ActionFunction,
   HeadersFunction,
   LoaderFunction,
+  redirect,
 } from "@remix-run/node";
-import { Form } from "@remix-run/react";
+import { Form, useSubmit } from "@remix-run/react";
 import { Remote } from "comlink";
 import markdownit from "markdown-it";
 import hljs from "highlight.js";
 import Handlebars from "handlebars";
-import { authorize, listFiles, uploadFile } from "~/drive";
+import { uploadFile } from "~/drive";
 import CodemirrorWrapper from "~/components/codemirror/CodemirrorWrapper";
 import { generateJwkFromUserId, generateSalt } from "~/crypto";
+import {
+  getOAuthClient,
+  getOAuthGenerateUrl,
+  refreshCredentials,
+} from "~/oauth";
+import { getSession } from "~/cookie";
+import { decrypt } from "~/crypto/session.server";
 
 export const headers: HeadersFunction = () => ({
   "Cross-Origin-Embedder-Policy": "require-corp",
   "Cross-Origin-Opener-Policy": "same-origin",
 });
 
-export const action: ActionFunction = async ({ request }) => {
-  const client = await authorize(request.headers.get("goog_drv_token"));
-  const text = (await request.formData()).get("doc") as string | null;
-  await uploadFile(client, text ?? "");
-  return null;
+export const action: ActionFunction = async ({ request, params }) => {
+  const formData = await request.formData();
+  const proc = formData.get("process");
+
+  switch (proc) {
+    case "auth": {
+      const oAuthClient = await getOAuthClient();
+      const url = getOAuthGenerateUrl(oAuthClient);
+      return redirect(url);
+    }
+    case "upload": {
+      const cookieHeader = request.headers.get("Cookie");
+      const session = await getSession(cookieHeader);
+      const idToken = decrypt(session.get("idToken"));
+      const accessToken = decrypt(session.get("accessToken"));
+
+      if (!idToken || !accessToken) {
+        return null;
+      }
+
+      const oAuthClient = await getOAuthClient();
+      await refreshCredentials(oAuthClient, {
+        id_token: idToken,
+        access_token: accessToken,
+      });
+      const doc = formData.get("doc") as string | "";
+      await uploadFile(oAuthClient, doc ?? "");
+      return null;
+    }
+    default: {
+      return null;
+    }
+  }
 };
 
 export const loader: LoaderFunction = async ({ request }) => {
-  const client = await authorize(request.headers.get("goog_drv_token"));
-  await listFiles(client);
   return null;
 };
 
@@ -53,6 +87,7 @@ const markdown = markdownit({
 // const md = "<!-- -->\n```javascript\nconsole.log('hello');\n```\n"
 
 export default function Index() {
+  const submit = useSubmit();
   const worker = useRef<Remote<typeof import("../worker")> | null>(null);
   const [doc, setDoc] = useState<string | null>(null);
   const [preview, setPreview] = useState("");
@@ -121,7 +156,20 @@ export default function Index() {
   return (
     <Form method="POST" className="flex flex-col gap-8" replace>
       <img src="/logo-dark.png" className="h-24 w-80" />
-      <button type="submit" className="btn btn-sm w-fit">
+      <button
+        type="submit"
+        name="process"
+        value="auth"
+        className="btn btn-sm w-fit"
+      >
+        auth
+      </button>
+      <button
+        type="submit"
+        name="process"
+        value="upload"
+        className="btn btn-sm w-fit"
+      >
         upload
       </button>
       <input type="hidden" name="doc" value={doc ?? ""} />

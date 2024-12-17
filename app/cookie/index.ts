@@ -1,5 +1,18 @@
-import { createCookie } from "@remix-run/node";
+import { createCookie, createCookieSessionStorage } from "@remix-run/node";
 
 export const googleDriveToken = await createCookie("goog_drv_token", {
   maxAge: 604_800,
 });
+
+const sessionCookie = await createCookieSessionStorage({
+  cookie: {
+    name: "goog_drv_token",
+    sameSite: "strict",
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 604_800,
+    secrets: ["secrets"],
+  },
+});
+
+export const { getSession, commitSession, destroySession } = sessionCookie;
