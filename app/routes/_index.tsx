@@ -17,6 +17,7 @@ import {
   getOAuthClient,
   getOAuthGenerateUrl,
   refreshCredentials,
+  verifyIdToken,
 } from "~/oauth";
 import { getSession } from "~/cookie";
 import { decrypt } from "~/crypto/session.server";
@@ -47,12 +48,11 @@ export const action: ActionFunction = async ({ request, params }) => {
       }
 
       const oAuthClient = await getOAuthClient();
-      await refreshCredentials(oAuthClient, {
-        id_token: idToken,
-        access_token: accessToken,
-      });
+      const verified = await verifyIdToken(oAuthClient, idToken, accessToken);
       const doc = formData.get("doc") as string | "";
-      await uploadFile(oAuthClient, doc ?? "");
+      if (verified) {
+        await uploadFile(oAuthClient, doc ?? "");
+      }
       return null;
     }
     default: {

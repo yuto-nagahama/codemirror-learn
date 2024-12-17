@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv } from "crypto";
 
 const algorithm = "aes-256-cbc";
 const secretKey = "12345678901234567890123456789012";
-const iv = new TextEncoder().encode("secrets");
+const iv = Buffer.from("1234567890123456");
 
 export const encrypt = (data: string) => {
   const cipher = createCipheriv(algorithm, secretKey, iv);

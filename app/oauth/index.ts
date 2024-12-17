@@ -57,3 +57,29 @@ export async function refreshCredentials(
   await client.refreshAccessToken();
   return client.credentials;
 }
+
+export async function verifyIdToken(
+  client: OAuth2Client,
+  idToken: string,
+  accessToken: string
+) {
+  client.setCredentials({
+    id_token: idToken,
+    access_token: accessToken,
+  });
+  const projectNumber = await metadata.project("numeric-project-id");
+  const secretName = `projects/${projectNumber}/secrets/oauth-credential/versions/latest`;
+  const secret = await getSecret(secretName);
+  const credentials = JSON.parse(secret);
+
+  try {
+    await client.verifyIdToken({
+      idToken,
+      audience: credentials.web.client_id,
+    });
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
