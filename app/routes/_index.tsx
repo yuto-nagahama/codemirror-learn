@@ -49,10 +49,12 @@ export const action: ActionFunction = async ({ request, params }) => {
 
       const oAuthClient = await getOAuthClient();
       const verified = await verifyIdToken(oAuthClient, idToken, accessToken);
-      const doc = formData.get("doc") as string | "";
+      const doc = formData.get("doc") as string | null;
+
       if (verified) {
         await uploadFile(oAuthClient, doc ?? "");
       }
+
       return null;
     }
     default: {

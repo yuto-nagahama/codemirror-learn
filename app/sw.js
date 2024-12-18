@@ -1,5 +1,6 @@
 import localForage from "localforage";
 import { extendPrototype } from "localforage-getitems";
+
 extendPrototype(localForage);
 
 const CACHE_VERSION = 1;
@@ -71,28 +72,26 @@ self.addEventListener("fetch", (event) => {
     );
   }
 
-  if (request.method === "GET") {
-    if (pathname.startsWith(`/asset/image`)) {
-      event.respondWith(
-        (async () => {
-          const dbInstance = localForage.createInstance({ name: "fileCache" });
-          /** @type { { createdAt: number, file: File } | undefined } */
-          const cache = await dbInstance.getItem(pathname);
+  if (request.method === "GET" && pathname.startsWith(`/asset/image`)) {
+    event.respondWith(
+      (async () => {
+        const dbInstance = localForage.createInstance({ name: "fileCache" });
+        /** @type { { createdAt: number, file: File } | undefined } */
+        const cache = await dbInstance.getItem(pathname);
 
-          if (cache == null) {
-            return new Response(null, { status: 404 });
-          }
+        if (cache == null) {
+          return new Response(null, { status: 404 });
+        }
 
-          const headers = {
-            "Content-Type": cache.type,
-          };
-          const res = new Response(cache.file, {
-            headers,
-          });
+        const headers = {
+          "Content-Type": cache.type,
+        };
+        const res = new Response(cache.file, {
+          headers,
+        });
 
-          return res;
-        })()
-      );
-    }
+        return res;
+      })()
+    );
   }
 });

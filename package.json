@@ -4,7 +4,7 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "build:sw": "esbuild ./app/sw.js --bundle --minify --target=esnext --outfile=./public/sw.js",
+    "build:sw": "node swbuild.js",
     "build": "node swbuild.js && remix vite:build",
     "dev": "node swbuild.js && node ./server.js",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
