@@ -47,6 +47,7 @@
     "googleapis": "^144.0.0",
     "handlebars": "^4.7.8",
     "highlight.js": "^11.10.0",
+    "hono": "^4.6.14",
     "isbot": "^4.1.0",
     "localforage": "^1.10.0",
     "localforage-getitems": "^1.4.2",

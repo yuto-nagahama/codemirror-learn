@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import { comlink } from "vite-plugin-comlink";
 import tsconfigPaths from "vite-tsconfig-paths";
 import basicSsl from "@vitejs/plugin-basic-ssl";
+import { resolve } from "node:path";
 
 declare module "@remix-run/node" {
   interface Future {

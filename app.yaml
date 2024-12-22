@@ -10,6 +10,8 @@ env_variables:
 automatic_scaling:
   max_instances: 1
   max_idle_instances: 0
+  min_instances: 0
+  max_idle_instances: 0
 
 handlers:
   - url: /.*
@@ -19,6 +21,11 @@ handlers:
     static_files: /build/client/\1
     upload: /build/client/.*\.(gif|png|jpg)$
     secure: always
+    expiration: 1d
   - url: /favicon.ico
-    static_dir: /build/client/favicon.ico
-    secure: always
+    static_files: /public/favicon.ico
+    upload: /public/favicon.ico
+  - url: /sw.js
+    static_files: /public/sw.js
+    upload: /public/sw.js
+    expiration: 0s

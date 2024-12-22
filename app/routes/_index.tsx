@@ -21,6 +21,7 @@ import {
 } from "~/oauth";
 import { getSession } from "~/cookie";
 import { decrypt } from "~/crypto/session.server";
+import localforage from "localforage";
 
 export const headers: HeadersFunction = () => ({
   "Cross-Origin-Embedder-Policy": "require-corp",
@@ -89,7 +90,6 @@ const markdown = markdownit({
 // const md = "<!-- -->\n```javascript\nconsole.log('hello');\n```\n"
 
 export default function Index() {
-  const submit = useSubmit();
   const worker = useRef<Remote<typeof import("../worker")> | null>(null);
   const [doc, setDoc] = useState<string | null>(null);
   const [preview, setPreview] = useState("");
@@ -111,9 +111,9 @@ export default function Index() {
     let output = doc;
 
     try {
-      output = compile(doc)({ arr: ["foo", "bar"] });
-    } catch {
-      //
+      output = compile(doc)({});
+    } catch (error) {
+      console.error(error);
     } finally {
       setPreview(markdown.render(output ?? ""));
     }
@@ -153,6 +153,56 @@ export default function Index() {
 
       connectDB();
     }
+  }, []);
+
+  useEffect(() => {
+    const listener = async (
+      event: MessageEvent<
+        | { type: "load-asset"; pathname: string }
+        | { type: "upload"; file: File }
+      >
+    ) => {
+      const type = event.data.type;
+      const dbInstance = localforage.createInstance({ name: "fileCache" });
+
+      switch (type) {
+        case "load-asset": {
+          const pathname = event.data.pathname;
+          const cache = await dbInstance.getItem<{
+            createdAt: number;
+            file: File;
+          }>(pathname);
+
+          navigator.serviceWorker.controller?.postMessage({
+            type: "load-complete",
+            file: cache?.file ?? null,
+          });
+          break;
+        }
+        case "upload": {
+          const { file } = event.data;
+          const pathname = `/asset/image/${file.name}`;
+          await dbInstance.setItem(pathname, {
+            createdAt: Date.now(),
+            file,
+          });
+
+          navigator.serviceWorker.controller?.postMessage({
+            type: "upload-complete",
+            pathname,
+          });
+          break;
+        }
+      }
+    };
+
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener("message", listener);
+    }
+
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", listener);
+    };
   }, []);
 
   return (

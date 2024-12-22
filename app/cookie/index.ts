@@ -1,8 +1,4 @@
-import { createCookie, createCookieSessionStorage } from "@remix-run/node";
-
-export const googleDriveToken = await createCookie("goog_drv_token", {
-  maxAge: 604_800,
-});
+import { createCookieSessionStorage } from "@remix-run/node";
 
 const sessionCookie = await createCookieSessionStorage({
   cookie: {
