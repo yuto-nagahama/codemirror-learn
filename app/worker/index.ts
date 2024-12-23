@@ -4,7 +4,10 @@ import sqlite3InitModule, {
   FlexibleString,
   Sqlite3Static,
 } from "@sqlite.org/sqlite-wasm";
+import { expose } from "comlink";
 import localforage from "localforage";
+
+declare const self: SharedWorkerGlobalScope;
 
 const log = console.log;
 const error = console.error;
@@ -72,7 +75,10 @@ export const initializeSQLite = async (key: JsonWebKey) => {
       await db.exec("pragma cache_size = -10000000");
       await db.exec("pragma synchronous = 'normal'");
       await db.exec(
-        "CREATE TABLE IF NOT EXISTS report(id text primary key, markdown TEXT(100000))"
+        "CREATE TABLE IF NOT EXISTS evidence(path text(10000) primary key, data blob not null)"
+      );
+      await db.exec(
+        "CREATE TABLE IF NOT EXISTS report(id text(16) primary key, markdown TEXT(100000))"
       );
 
       const dbfile = sqlite3?.capi.sqlite3_js_db_export(db);
@@ -167,3 +173,21 @@ const encryption = async (id: string) => {
     encryptionDb: encryptedArrayBuffer,
   });
 };
+
+// self.addEventListener("connect", (event) => {
+//   const port = event.ports[0];
+//   expose(
+//     {
+//       initializeSQLite,
+//       exec,
+//       selectValue,
+//     },
+//     port
+//   );
+// });
+
+expose({
+  initializeSQLite,
+  exec,
+  selectValue,
+});

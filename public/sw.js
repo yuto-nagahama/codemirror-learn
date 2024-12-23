@@ -3951,29 +3951,16 @@ var CACHE_VERSION = 1;
 var expires = 7884e6;
 self.addEventListener("activate", (event) => {
   const fn = async () => {
-    const fileDb = import_localforage.default.createInstance({
-      name: "fileCache",
-      version: CACHE_VERSION
-    });
     const reportDb = import_localforage.default.createInstance({
       name: "report",
       version: CACHE_VERSION
     });
-    const [cacheFiles, reportData] = await Promise.all([
-      fileDb.getItems(),
-      reportDb.getItems()
-    ]);
-    const data = [...Object.entries(cacheFiles), ...Object.entries(reportData)];
+    const reportData = await reportDb.getItems();
+    const data = Object.entries(reportData);
     await Promise.all(
       data.map(async ([key, value]) => {
-        if ("updatedAt" in value) {
-          if (Date.now() - value.updatedAt > expires) {
-            await reportDb.removeItem(key);
-          }
-        } else {
-          if (Date.now() - value.createdAt > expires) {
-            await cacheFiles.removeItem(key);
-          }
+        if (Date.now() - value.updatedAt > expires) {
+          await reportDb.removeItem(key);
         }
       })
     );
@@ -3985,10 +3972,7 @@ app.post("/api/asset/upload", async (c) => {
   const { req } = c;
   const formData = await req.formData();
   const file = formData.get("file");
-  if (!(file instanceof File)) {
-    return new Response(null, { status: 400 });
-  }
-  if (!file.type.startsWith("image")) {
+  if (!(file instanceof File) || !file.type.startsWith("image")) {
     return new Response(null, { status: 400 });
   }
   try {
@@ -4073,6 +4057,9 @@ app.get("/asset/image/:id", async (c) => {
     console.error(error);
     return new Response(null, { status: 404 });
   }
+});
+app.notFound((c) => {
+  return c.res;
 });
 self.addEventListener("fetch", handle(app));
 /*! Bundled license information:

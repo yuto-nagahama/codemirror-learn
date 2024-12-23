@@ -5,7 +5,7 @@ import {
   LoaderFunction,
   redirect,
 } from "@remix-run/node";
-import { Form, useSubmit } from "@remix-run/react";
+import { Form } from "@remix-run/react";
 import { Remote } from "comlink";
 import markdownit from "markdown-it";
 import hljs from "highlight.js";
@@ -13,15 +13,9 @@ import Handlebars from "handlebars";
 import { uploadFile } from "~/drive";
 import CodemirrorWrapper from "~/components/codemirror/CodemirrorWrapper";
 import { generateJwkFromUserId, generateSalt } from "~/crypto";
-import {
-  getOAuthClient,
-  getOAuthGenerateUrl,
-  refreshCredentials,
-  verifyIdToken,
-} from "~/oauth";
+import { getOAuthClient, getOAuthGenerateUrl, verifyIdToken } from "~/oauth";
 import { getSession } from "~/cookie";
 import { decrypt } from "~/crypto/session.server";
-import localforage from "localforage";
 
 export const headers: HeadersFunction = () => ({
   "Cross-Origin-Embedder-Policy": "require-corp",
@@ -87,12 +81,11 @@ const markdown = markdownit({
   },
 });
 
-// const md = "<!-- -->\n```javascript\nconsole.log('hello');\n```\n"
-
 export default function Index() {
   const worker = useRef<Remote<typeof import("../worker")> | null>(null);
   const [doc, setDoc] = useState<string | null>(null);
   const [preview, setPreview] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const handleUpdateDoc = (content: string) => {
     setDoc(content);
 
@@ -113,7 +106,11 @@ export default function Index() {
     try {
       output = compile(doc)({});
     } catch (error) {
-      console.error(error);
+      if (error instanceof Error) {
+        if (!error.message.includes("Handlebars")) {
+          console.error(error);
+        }
+      }
     } finally {
       setPreview(markdown.render(output ?? ""));
     }
@@ -128,6 +125,10 @@ export default function Index() {
           type: "module",
         }
       );
+      // const sharedWorker = new SharedWorker(
+      //   new URL("../worker", import.meta.url)
+      // );
+      // worker.current = wrap(sharedWorker.port);
 
       const connectDB = async () => {
         if (!worker.current) {
@@ -149,6 +150,7 @@ export default function Index() {
         } else if (typeof text === "undefined") {
           setDoc("");
         }
+        setIsLoading(false);
       };
 
       connectDB();
@@ -163,28 +165,31 @@ export default function Index() {
       >
     ) => {
       const type = event.data.type;
-      const dbInstance = localforage.createInstance({ name: "fileCache" });
 
       switch (type) {
         case "load-asset": {
+          const db = worker.current;
           const pathname = event.data.pathname;
-          const cache = await dbInstance.getItem<{
-            createdAt: number;
-            file: File;
-          }>(pathname);
+          const cache = (await db?.selectValue(
+            `select data from evidence where path = ?`,
+            [pathname]
+          )) as Uint8Array | null | undefined;
 
           navigator.serviceWorker.controller?.postMessage({
             type: "load-complete",
-            file: cache?.file ?? null,
+            file: cache ?? null,
           });
           break;
         }
         case "upload": {
           const { file } = event.data;
+          const db = worker.current;
           const pathname = `/asset/image/${file.name}`;
-          await dbInstance.setItem(pathname, {
-            createdAt: Date.now(),
-            file,
+          const fileArrayBuffer = new Uint8Array(await file.arrayBuffer());
+
+          db?.exec({
+            sql: `insert into evidence (path, data) values (?, ?)`,
+            bind: [pathname, fileArrayBuffer],
           });
 
           navigator.serviceWorker.controller?.postMessage({
@@ -204,6 +209,10 @@ export default function Index() {
       navigator.serviceWorker.removeEventListener("message", listener);
     };
   }, []);
+
+  if (isLoading) {
+    return null;
+  }
 
   return (
     <Form method="POST" className="flex flex-col gap-8" replace>

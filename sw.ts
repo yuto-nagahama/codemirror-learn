@@ -12,31 +12,18 @@ const expires = 7884000000; // 3ヶ月(ミリ秒)
 
 self.addEventListener("activate", (event) => {
   const fn = async () => {
-    const fileDb = localForage.createInstance({
-      name: "fileCache",
-      version: CACHE_VERSION,
-    });
     const reportDb = localForage.createInstance({
       name: "report",
       version: CACHE_VERSION,
     });
-    const [cacheFiles, reportData] = await Promise.all([
-      fileDb.getItems(),
-      reportDb.getItems(),
-    ]);
+    const reportData = await reportDb.getItems();
 
     // 3ヶ月以上前のキャッシュは削除する
-    const data = [...Object.entries(cacheFiles), ...Object.entries(reportData)];
+    const data = Object.entries(reportData);
     await Promise.all(
       data.map(async ([key, value]) => {
-        if ("updatedAt" in value) {
-          if (Date.now() - value.updatedAt > expires) {
-            await reportDb.removeItem(key);
-          }
-        } else {
-          if (Date.now() - value.createdAt > expires) {
-            await cacheFiles.removeItem(key);
-          }
+        if (Date.now() - value.updatedAt > expires) {
+          await reportDb.removeItem(key);
         }
       })
     );
@@ -51,11 +38,7 @@ app.post("/api/asset/upload", async (c) => {
   const formData = await req.formData();
   const file = formData.get("file");
 
-  if (!(file instanceof File)) {
-    return new Response(null, { status: 400 });
-  }
-
-  if (!file.type.startsWith("image")) {
+  if (!(file instanceof File) || !file.type.startsWith("image")) {
     return new Response(null, { status: 400 });
   }
 
@@ -150,6 +133,10 @@ app.get("/asset/image/:id", async (c) => {
     console.error(error);
     return new Response(null, { status: 404 });
   }
+});
+
+app.notFound((c) => {
+  return c.res;
 });
 
 self.addEventListener("fetch", handle(app));
